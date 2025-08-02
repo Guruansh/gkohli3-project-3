@@ -1,0 +1,25 @@
+/* 
+  Localizable.strings
+  Aqi
+
+  Created by Guruansh  Kohli  on 8/1/25.
+  
+*/
+"Default ZIP Code" = "Code postal par défaut";
+"ZIP Code" = "Code postal";
+"Theme" = "Thème";
+"Enable Notifications" = "Activer les notifications";
+"Language" = "Langue";
+"Settings" = "Paramètres";
+"System" = "Système";
+"Light" = "Clair";
+"Dark" = "Sombre";
+"English" = "Anglais";
+"Español" = "Espagnol";
+"Français" = "Français";
+"AQI: %d" = "IQA : %d";
+"Location: %@" = "Lieu : %@";
+"Time: %@ @ %02d:00 %@" = "Heure : %@ @ %02d:00 %@";
+"Home" = "Accueil";
+"About" = "À propos";
+
