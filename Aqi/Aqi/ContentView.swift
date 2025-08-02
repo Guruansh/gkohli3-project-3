@@ -17,6 +17,7 @@ enum Pollutant: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+// ContentView
 struct ContentView: View {
     @StateObject private var vm = AQIViewModel()
     @AppStorage("defaultZip") private var zipCode: String = ""
@@ -150,3 +151,4 @@ struct ContentView: View {
 #Preview {
     ContentView()
 }
+
