@@ -1,4 +1,3 @@
-//
 //  ContentView.swift
 //  Aqi
 //
@@ -18,19 +17,6 @@ enum Pollutant: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-// Maping Category names to colors for the badge
-func colorForCategory(_ category: String) -> Color {
-    switch category.lowercased() {
-    case "good": return .green
-    case "moderate": return .yellow
-    case "unhealthy for sensitive groups": return .orange
-    case "unhealthy": return .red
-    case "very unhealthy": return .purple
-    case "hazardous": return .indigo
-    default: return .blue
-    }
-}
-
 struct ContentView: View {
     @StateObject private var vm = AQIViewModel()
     @AppStorage("defaultZip") private var zipCode: String = ""
@@ -40,39 +26,105 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                zipCodeInputView
-                cityDateView
-                pollutantListView
+                // ZIP code input & Fetch AQI button
+                HStack {
+                    TextField(NSLocalizedString("Enter ZIP Code", comment: ""), text: $zipCode)
+                        .keyboardType(.numberPad)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .frame(maxWidth: 200)
+                        .padding(.horizontal)
 
-                // About button
-                NavigationLink(destination: InfoView()) {
-                    HStack {
-                        Image(systemName: "info.circle")
-                        Text(LocalizedStringKey("About"))
+                    Button(NSLocalizedString("Fetch AQI", comment: "")) {
+                        vm.load(zip: zipCode)
                     }
-                    .font(.headline)
-                    .padding()
-                    .background(Color.purple.opacity(0.2))
+                    .disabled(zipCode.isEmpty || vm.isLoading)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(
+                        Color.purple
+                            .opacity(zipCode.isEmpty || vm.isLoading ? 0.3 : 0.2)
+                    )
                     .cornerRadius(8)
                 }
+
+                // City & Date info
+                if let obs0 = vm.observations.first {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(String(format: NSLocalizedString("City: %@", comment: ""), obs0.ReportingArea))
+                        Text(String(format: NSLocalizedString("Date: %@ @ %02d:00 %@", comment: ""), obs0.DateObserved, obs0.HourObserved, obs0.LocalTimeZone))
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal)
+                }
+
+                // Loading indicator or pollutant list with tappable rows
+                if vm.isLoading {
+                    ProgressView(NSLocalizedString("Loading…", comment: ""))
+                        .frame(maxHeight: .infinity)
+                } else {
+                    List(Pollutant.allCases) { type in
+                        if let obs = vm.observations.first(where: {
+                            $0.ParameterName.caseInsensitiveCompare(type.rawValue) == .orderedSame
+                        }) {
+                            NavigationLink(destination: AqsDetailView(observation: obs)) {
+                                HStack {
+                                    Text(type.rawValue)
+                                        .font(.headline)
+                                    Spacer()
+                                    Text(String(format: NSLocalizedString("AQI: %d", comment: ""), obs.AQI))
+                                        .font(.subheadline)
+                                    Text(obs.Category.Name)
+                                        .font(.caption)
+                                        .padding(6)
+                                        .background(Color.purple.opacity(0.2))
+                                        .cornerRadius(6)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        } else {
+                            HStack {
+                                Text(type.rawValue)
+                                    .font(.headline)
+                                Spacer()
+                                Text(NSLocalizedString("N/A", comment: ""))
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .listStyle(.insetGrouped)
+                }
             }
-            .navigationTitle(LocalizedStringKey("Air Quality"))
+            // About button
+            NavigationLink(destination: InfoView()) {
+                HStack {
+                    Image(systemName: "info.circle")
+                    Text(LocalizedStringKey("About"))
+                }
+                .font(.headline)
+                .padding()
+                .background(Color.purple.opacity(0.2))
+                .cornerRadius(8)
+            }
+
+            .navigationTitle(NSLocalizedString("Air Quality", comment: ""))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                //settings button
+                // < Settings button
                 ToolbarItem(placement: .navigationBarLeading) {
                     NavigationLink(destination: SettingsView()) {
                         HStack(spacing: 4) {
                             Image(systemName: "chevron.left")
-                            Text(LocalizedStringKey("Settings"))
+                            Text(NSLocalizedString("Settings", comment: ""))
                         }
                         .foregroundColor(.purple)
                     }
                 }
             }
-            // if no internet displays network error as an alert
-            .alert(LocalizedStringKey("Network Error"), isPresented: $showErrorAlert) {
-                Button(LocalizedStringKey("OK"), role: .cancel) {
+            .alert(NSLocalizedString("Network Error", comment: ""), isPresented: $showErrorAlert) {
+                Button("OK", role: .cancel) {
                     vm.errorMessage = nil
                 }
             } message: {
@@ -85,136 +137,15 @@ struct ContentView: View {
         }
     }
 
-    private var zipCodeInputView: some View {
-        
-        // asking for zip code
-        HStack {
-            TextField(LocalizedStringKey("Enter ZIP Code"), text: $zipCode)
-                .keyboardType(.numberPad)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .frame(maxWidth: 200)
-                .padding(.horizontal)
-            // button to fetch the aqi
-            Button(LocalizedStringKey("Fetch AQI")) {
-                vm.load(zip: zipCode)
-            }
-            .disabled(zipCode.isEmpty || vm.isLoading)
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            .background(Color.purple.opacity(zipCode.isEmpty || vm.isLoading ? 0.3 : 0.2))
-            .cornerRadius(8)
-            .scaleEffect(vm.isLoading ? 1.0 : 1.03)
-            .animation(.spring(response: 0.3, dampingFraction: 0.5), value: vm.isLoading)
-        }
-    }
-
-    private var cityDateView: some View {
-        Group {
-            if let obs0 = vm.observations.first {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(NSLocalizedString("City", comment: "")): \(obs0.ReportingArea)")
-                    Text("\(NSLocalizedString("Date", comment: "")): \(obs0.DateObserved) @ \(obs0.HourObserved):00 \(obs0.LocalTimeZone)")
-                }
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .padding(.horizontal)
-            }
-        }
-    }
-
-    private var pollutantListView: some View {
-        Group {
-            if vm.isLoading {
-                // spinner while loading animation
-                ProgressView(LocalizedStringKey("Loading…"))
-                    .frame(maxHeight: .infinity)
-            } else {
-                List {
-                    ForEach(Array(Pollutant.allCases.enumerated()), id: \.offset) { index, pollutant in
-                        let match = vm.observations.first(where: { $0.ParameterName == pollutant.rawValue })
-                        PollutantRowView(index: index, type: pollutant, observation: match)
-                    }
-
-                }
-                .listStyle(.insetGrouped)
-                .transition(.slide)
-            }
-        }
-    }
-    // Chooses the current Locale from app settings
     private func currentLocale() -> Locale {
-
-            switch LanguageOption(rawValue: languageOverrideRaw) ?? .system {
-
-            case .english: return Locale(identifier: "en")
-
-            case .spanish: return Locale(identifier: "es")
-
-            case .french: return Locale(identifier: "fr")
-
-            case .system: return Locale.current
-
-            }
-
+        switch LanguageOption(rawValue: languageOverrideRaw) ?? .system {
+        case .english: return Locale(identifier: "en")
+        case .spanish: return Locale(identifier: "es")
+        case .french: return Locale(identifier: "fr")
+        case .system: return Locale.current
         }
-}
-
-struct PollutantRowView: View {
-    let index: Int
-    let type: Pollutant
-    let observation: AQObservation?
-
-    var body: some View {
-        Group {
-            if let obs = observation {
-                // Tappable row navigates to detailView
-                NavigationLink(destination: AqsDetailView(observation: obs)) {
-                    HStack {
-                        Text(type.rawValue)
-                            .font(.headline)
-                            .foregroundColor(.primary)
-
-                        Spacer()
-
-                        Text("AQI: \(obs.AQI)")
-                            .font(.subheadline)
-                            .foregroundColor(.primary)
-                        
-                        Text(obs.Category.Name)
-                            .font(.caption)
-                            .padding(6)
-                            .background(colorForCategory(obs.Category.Name).opacity(0.5))
-                            .foregroundColor(.primary)
-                            .cornerRadius(6)
-                    }
-                    .padding(.vertical, 8)
-                }
-            } else {
-                HStack {
-                    Text(type.rawValue)
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    Text("N/A")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.vertical, 8)
-            }
-        }
-        .padding(.horizontal)
-        // adapts to light/dark
-        .background(Color(.systemBackground))
-        .cornerRadius(10)
-        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-        .transition(.opacity)
-        .animation(.easeInOut.delay(Double(index) * 0.05), value: observation?.AQI ?? -1)
     }
 }
-
-
 
 #Preview {
     ContentView()
